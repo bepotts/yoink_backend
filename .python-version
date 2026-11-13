@@ -1,0 +1,2 @@
+# Selects the Python version used by uv.
+3.13
