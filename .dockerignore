@@ -1,0 +1,10 @@
+# Limits the build context to package metadata and application source.
+**
+!Dockerfile
+!pyproject.toml
+!uv.lock
+!README.md
+!src/
+!src/**
+**/__pycache__/
+**/*.py[cod]

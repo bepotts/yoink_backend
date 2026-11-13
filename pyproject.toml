@@ -5,7 +5,10 @@ version = "0.1.0"
 description = "Backend services for Yoink."
 readme = "README.md"
 requires-python = ">=3.13"
-dependencies = []
+dependencies = [
+    "fastapi>=0.162.7",
+    "uvicorn[standard]>=0.54.0",
+]
 
 [project.scripts]
 yoink-backend = "yoink_backend.__main__:main"
@@ -16,6 +19,7 @@ build-backend = "hatchling.build"
 
 [dependency-groups]
 dev = [
+    "httpx>=0.28.1",
     "mypy>=1.15,<2",
     "pre-commit>=4,<5",
     "pytest>=8,<10",

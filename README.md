@@ -15,6 +15,22 @@ uv run --locked yoink-backend
 uv installs the selected Python version when needed and creates `.venv`.
 Commit `uv.lock` to keep dependency versions reproducible.
 
+The command starts FastAPI on port 8000. Open [API docs](http://localhost:8000/docs)
+or check [service health](http://localhost:8000/health). Stop with Ctrl+C.
+`python -m yoink_backend` also starts the server inside the project environment.
+
+## Docker
+
+With Docker and Compose installed, run:
+
+```sh
+docker compose up --build
+```
+
+The API is available at the same local URLs. Stop with Ctrl+C, then run
+`docker compose down` to remove the container. The image runs as a non-root user
+and includes a health check. Compose binds the published port to localhost.
+
 ## Development
 
 ```sh

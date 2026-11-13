@@ -1,15 +1,14 @@
 # Verifies the installed application's entry point.
 """Tests for the starter command."""
 
-import pytest
+from unittest.mock import patch
 
 from yoink_backend.__main__ import main
 
 
-# Checks that the starter command reports readiness without errors.
-def test_main(capsys: pytest.CaptureFixture[str]) -> None:
-    """Verify the entry point's output."""
-    main()
-    captured = capsys.readouterr()
-    assert captured.out == "Yoink backend is ready.\n"
-    assert captured.err == ""
+# Checks that invoking the application starts the configured HTTP server.
+def test_main() -> None:
+    """Verify the server entry point without blocking the test runner."""
+    with patch("yoink_backend.__main__.uvicorn.run") as run:
+        main()
+    run.assert_called_once_with("yoink_backend.app:app", host="0.0.0.0", port=8000)
