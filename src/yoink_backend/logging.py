@@ -3,12 +3,16 @@
 
 import logging
 import sys
+from datetime import UTC, datetime
 from time import perf_counter
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import structlog
 from fastapi import Request, Response
 from starlette.middleware.base import RequestResponseEndpoint
+
+from yoink_backend.database import save_request
+from yoink_backend.schemas import RequestLogCreate
 
 
 # Routes application and library records through the same JSON processor chain.
@@ -47,22 +51,30 @@ def configure_logging() -> None:
 async def log_request(request: Request, call_next: RequestResponseEndpoint) -> Response:
     """Record elapsed time and status, preserving unexpected exceptions."""
     structlog.contextvars.clear_contextvars()
-    request_id = str(uuid4())
+    try:
+        request_id = UUID(request.headers.get("X-Request-ID", ""))
+    except ValueError:
+        request_id = uuid4()
+    started_at = datetime.now(UTC)
+    status_code = 500
+    error_type = None
     structlog.contextvars.bind_contextvars(
-        request_id=request_id, method=request.method, path=request.url.path
+        request_id=str(request_id), method=request.method, path=request.url.path
     )
     logger = structlog.get_logger(__name__)
     started = perf_counter()
     try:
         response = await call_next(request)
-        response.headers["X-Request-ID"] = request_id
+        response.headers["X-Request-ID"] = str(request_id)
+        status_code = response.status_code
         logger.info(
             "request_completed",
             status_code=response.status_code,
             duration_ms=round((perf_counter() - started) * 1000, 2),
         )
         return response
-    except Exception:
+    except Exception as error:
+        error_type = type(error).__name__
         logger.exception(
             "request_failed",
             status_code=500,
@@ -70,4 +82,23 @@ async def log_request(request: Request, call_next: RequestResponseEndpoint) -> R
         )
         raise
     finally:
-        structlog.contextvars.clear_contextvars()
+        try:
+            await save_request(
+                request.app.state.database,
+                RequestLogCreate(
+                    request_id=request_id,
+                    started_at=started_at,
+                    method=request.method,
+                    path=request.url.path,
+                    status_code=status_code,
+                    duration_ms=round((perf_counter() - started) * 1000, 2),
+                    client_ip=request.client.host if request.client else None,
+                    user_agent=request.headers.get("user-agent"),
+                    http_version=request.scope.get("http_version", "1.1"),
+                    error_type=error_type,
+                ),
+            )
+        except Exception:
+            logger.exception("request_log_persistence_failed")
+        finally:
+            structlog.contextvars.clear_contextvars()

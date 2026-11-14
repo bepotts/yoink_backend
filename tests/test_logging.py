@@ -5,7 +5,8 @@ import asyncio
 import io
 import json
 import logging
-from unittest.mock import patch
+from unittest.mock import AsyncMock, MagicMock, patch
+from uuid import UUID, uuid4
 
 import pytest
 import structlog
@@ -63,9 +64,13 @@ def test_request_logging() -> None:
                 "path": "/test",
                 "query_string": b"token=secret",
                 "headers": [],
+                "app": MagicMock(),
             }
         )
-        with structlog.testing.capture_logs() as records:
+        with (
+            structlog.testing.capture_logs() as records,
+            patch("yoink_backend.logging.save_request", new_callable=AsyncMock) as save,
+        ):
             responses = await asyncio.gather(
                 log_request(request, success), log_request(request, success)
             )
@@ -75,9 +80,76 @@ def test_request_logging() -> None:
             )
             with pytest.raises(RuntimeError, match="broken"):
                 await log_request(request, failure)
+        assert save.await_count == 3
+        assert save.call_args.args[1].error_type == "RuntimeError"
         assert [record["status_code"] for record in records] == [201, 201, 500]
         assert records[-1]["event"] == "request_failed"
         assert "secret" not in str(records)
         assert structlog.contextvars.get_contextvars() == {}
 
     asyncio.run(exercise())
+
+
+# Ensures a database failure does not replace the original response or exception.
+def test_database_failure() -> None:
+    """Retain JSON failure evidence and always clear request context."""
+
+    # Simulates an HTTP response when storage is unavailable.
+    async def respond(request: Request) -> Response:
+        return Response(status_code=204)
+
+    request = Request(
+        {
+            "type": "http",
+            "method": "GET",
+            "path": "/health",
+            "headers": [],
+            "client": ("127.0.0.1", 123),
+            "app": MagicMock(),
+        }
+    )
+    with (
+        patch(
+            "yoink_backend.logging.save_request", side_effect=RuntimeError("offline")
+        ),
+        structlog.testing.capture_logs() as records,
+    ):
+        response = asyncio.run(log_request(request, respond))
+    assert response.status_code == 204
+    assert records[-1]["event"] == "request_log_persistence_failed"
+    assert structlog.contextvars.get_contextvars() == {}
+
+
+# Preserves valid client IDs across response headers, structured logs, and storage.
+@pytest.mark.parametrize("supplied", [str(uuid4()), "invalid-id", ""])
+def test_client_request_id(supplied: str) -> None:
+    """Use client UUIDs and generate a safe fallback for malformed headers."""
+
+    # Returns a response through the request logging middleware.
+    async def respond(request: Request) -> Response:
+        return Response(status_code=200)
+
+    request = Request(
+        {
+            "type": "http",
+            "method": "GET",
+            "path": "/health",
+            "headers": [(b"x-request-id", supplied.encode())],
+            "app": MagicMock(),
+        }
+    )
+    with (
+        patch("yoink_backend.logging.save_request", new_callable=AsyncMock) as save,
+        patch("yoink_backend.logging.structlog.get_logger") as logger,
+    ):
+        response = asyncio.run(log_request(request, respond))
+        with_context = structlog.contextvars.get_contextvars()
+    request_id = response.headers["X-Request-ID"]
+    assert str(UUID(request_id)) == request_id
+    if supplied not in {"invalid-id", ""}:
+        assert request_id == supplied
+    else:
+        assert request_id != supplied
+    assert str(save.call_args.args[1].request_id) == request_id
+    logger.return_value.info.assert_called_once()
+    assert with_context == {}

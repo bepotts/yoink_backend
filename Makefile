@@ -1,11 +1,13 @@
 # Provides common commands for developing and validating the project.
 .DEFAULT_GOAL := help
 
-.PHONY: help install run dev check lint format-check typecheck format test build docker-build docker-up docker-down docker-logs
+.PHONY: migrate migration-check help install run dev check lint format-check typecheck format test build docker-build docker-up docker-down docker-logs
 
 help:
 	@printf '%s\n' \
 	  'install       Install locked development dependencies' \
+	  'migrate       Apply migrations to the APP_ENV-selected database' \
+	  'migration-check Check ORM models against the migrated schema' \
 	  'run           Start the API on port 8000' \
 	  'dev           Start the API with automatic reload' \
 	  'check         Run lint, formatting, types, and tests' \
@@ -61,3 +63,9 @@ docker-down:
 
 docker-logs:
 	docker compose logs --follow backend
+
+migrate:
+	uv run --locked alembic upgrade head
+
+migration-check:
+	uv run --locked alembic check

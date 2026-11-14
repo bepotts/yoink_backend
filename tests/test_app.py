@@ -51,3 +51,34 @@ def test_startup_rejects_s3_failure(s3_check: Mock) -> None:
     with pytest.raises(RuntimeError, match="S3 connection check failed"):
         with TestClient(app):
             pytest.fail("The application started despite an S3 failure")
+
+
+# Confirms all HTTP outcomes create one database row sharing the response ID.
+def test_request_rows(database: Mock) -> None:
+    """Persist successful, missing, and invalid requests with safe metadata."""
+    with TestClient(app) as client:
+        responses = [
+            client.get("/health?token=private", headers={"User-Agent": "test-agent"}),
+            client.get("/missing"),
+            client.post("/uploads/s3"),
+        ]
+    session = database.begin.return_value.__aenter__.return_value
+    calls = session.add.call_args_list
+    assert len(calls) == 3
+    for response, call in zip(responses, calls, strict=True):
+        record = call.args[0]
+        assert str(record.request_id) == response.headers["X-Request-ID"]
+        assert record.status_code == response.status_code
+        assert record.duration_ms >= 0
+        assert "private" not in record.path
+    assert calls[0].args[0].user_agent == "test-agent"
+
+
+# Confirms PostgreSQL initialization errors prevent the API from starting.
+def test_startup_rejects_database_failure() -> None:
+    """Surface missing database connectivity before serving any requests."""
+    with patch("yoink_backend.app.open_database") as database:
+        database.return_value.__aenter__.side_effect = RuntimeError("database offline")
+        with pytest.raises(RuntimeError, match="database offline"):
+            with TestClient(app):
+                pytest.fail("The application started despite a database failure")

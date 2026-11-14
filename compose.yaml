@@ -4,6 +4,30 @@ services:
     build: .
     env_file:
       - .env
+    environment:
+      DATABASE_DEV_URL: ${DATABASE_DEV_URL:-postgresql://yoink:yoink@postgres:5432/yoink_development}
+      DATABASE_PROD_URL: ${DATABASE_PROD_URL:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
     ports:
       - "127.0.0.1:8000:8000"
     init: true
+  postgres:
+    image: postgres:18
+    environment:
+      POSTGRES_USER: yoink
+      POSTGRES_PASSWORD: yoink
+      POSTGRES_DB: yoink_development
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U yoink -d yoink_development"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  postgres_data:
