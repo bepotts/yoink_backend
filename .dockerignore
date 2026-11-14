@@ -1,9 +1,12 @@
-# Limits the build context to package metadata and application source.
+# Limits the build context to package metadata, application source, and migrations.
 **
 !Dockerfile
 !pyproject.toml
 !uv.lock
 !README.md
+!alembic.ini
+!migrations/
+!migrations/**
 !src/
 !src/**
 **/__pycache__/
