@@ -1,0 +1,104 @@
+# Validates backend code, tests, packaging, and the Docker runtime on GitHub.
+name: Backend CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Lint and formatting
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Set up uv and Python
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: "0.9.21"
+          python-version: "3.13"
+          enable-cache: true
+      - name: Install locked dependencies
+        run: uv sync --locked
+      - name: Lint
+        run: uv run --locked ruff check .
+      - name: Check formatting
+        run: uv run --locked ruff format --check .
+
+  checks:
+    name: Type checks and tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Set up uv and Python
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: "0.9.21"
+          python-version: "3.13"
+          enable-cache: true
+      - name: Install locked dependencies
+        run: uv sync --locked
+      - name: Type check
+        run: uv run --locked mypy
+      - name: Test with coverage
+        run: uv run --locked pytest
+
+  build:
+    name: Python package build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Set up uv and Python
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: "0.9.21"
+          python-version: "3.13"
+          enable-cache: true
+      - name: Build wheel and source distribution
+        run: uv build
+
+  docker:
+    name: Docker build and smoke test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Validate Compose configuration
+        run: |
+          cp .env.example .env
+          docker compose config --quiet
+      - name: Build image
+        run: docker build --tag yoink-backend:ci .
+      - name: Verify startup fails without S3 configuration
+        run: |
+          docker run --detach --name backend-ci yoink-backend:ci
+          exit_code=$(timeout 30s docker wait backend-ci)
+          test "$exit_code" -ne 0
+          docker logs backend-ci 2>&1 | grep -F 'Application startup failed'
+      - name: Show server logs and clean up
+        if: always()
+        run: |
+          docker logs backend-ci || true
+          docker rm --force backend-ci || true
