@@ -29,7 +29,7 @@ build-backend = "hatchling.build"
 [dependency-groups]
 dev = [
     "boto3-stubs[s3]>=1.44.3",
-    "httpx>=0.28.1",
+    "httpx2>=2.16.0",
     "mypy>=1.15,<2",
     "pre-commit>=4,<5",
     "pytest>=8,<10",
