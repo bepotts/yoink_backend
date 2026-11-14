@@ -4,9 +4,9 @@
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
-from sqlalchemy import select
-from sqlalchemy.engine import make_url
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy import select # pyright: ignore[reportMissingImports]
+from sqlalchemy.engine import make_url # pyright: ignore[reportMissingImports]
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine  # pyright: ignore[reportMissingImports]
 
 from yoink_backend.models import RequestLog
 from yoink_backend.schemas import RequestLogCreate
