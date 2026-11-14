@@ -7,9 +7,12 @@ from pathlib import PurePosixPath
 from uuid import uuid4
 
 import boto3
+import structlog
 from botocore.config import Config
 from botocore.exceptions import BotoCoreError, ClientError
 from fastapi import APIRouter, HTTPException, UploadFile
+
+logger = structlog.get_logger(__name__)
 
 router = APIRouter(prefix="/uploads/s3", tags=["uploads"])
 
@@ -90,7 +93,9 @@ def upload(file: UploadFile) -> dict[str, str]:
                 },
             )
     except (BotoCoreError, ClientError) as error:
+        logger.exception("s3_upload_failed", region=region)
         raise HTTPException(
             502, "S3 upload failed. Check backend AWS configuration."
         ) from error
+    logger.info("s3_upload_completed", region=region, size_bytes=file.size)
     return {"bucket": bucket, "key": key}

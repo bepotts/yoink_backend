@@ -27,7 +27,7 @@ run:
 	uv run --locked yoink-backend
 
 dev:
-	uv run --locked uvicorn yoink_backend.app:app --reload --host 127.0.0.1 --port 8000
+	uv run --locked uvicorn yoink_backend.app:app --reload --no-access-log --host 127.0.0.1 --port 8000
 
 check: lint format-check typecheck test
 

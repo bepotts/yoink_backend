@@ -11,4 +11,6 @@ def test_main() -> None:
     """Verify the server entry point without blocking the test runner."""
     with patch("yoink_backend.__main__.uvicorn.run") as run:
         main()
-    run.assert_called_once_with("yoink_backend.app:app", host="0.0.0.0", port=8000)
+    run.assert_called_once_with(
+        "yoink_backend.app:app", host="0.0.0.0", port=8000, access_log=False
+    )
