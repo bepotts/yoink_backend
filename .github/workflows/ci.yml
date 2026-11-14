@@ -13,6 +13,11 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# Use GitHub-provisioned stable interpreters instead of uv's bundled download catalog.
+env:
+  UV_PYTHON_DOWNLOADS: never
+  UV_PYTHON_PREFERENCE: only-system
+
 jobs:
   lint:
     name: Lint and formatting
@@ -23,7 +28,15 @@ jobs:
         uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - name: Set up uv and Python
+      - name: Set up stable Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+          check-latest: true
+          allow-prereleases: false
+      - name: Verify stable interpreter
+        run: python -c "import sys; print(sys.version); assert sys.version_info.releaselevel == 'final'"
+      - name: Set up uv
         uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
         with:
           version: "0.9.21"
@@ -51,7 +64,15 @@ jobs:
         uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - name: Set up uv and Python
+      - name: Set up stable Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python-version }}
+          check-latest: true
+          allow-prereleases: false
+      - name: Verify stable interpreter
+        run: python -c "import sys; print(sys.version); assert sys.version_info.releaselevel == 'final'"
+      - name: Set up uv
         uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
         with:
           version: "0.9.21"
@@ -79,7 +100,15 @@ jobs:
         uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - name: Set up uv and Python
+      - name: Set up stable Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python-version }}
+          check-latest: true
+          allow-prereleases: false
+      - name: Verify stable interpreter
+        run: python -c "import sys; print(sys.version); assert sys.version_info.releaselevel == 'final'"
+      - name: Set up uv
         uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
         with:
           version: "0.9.21"
