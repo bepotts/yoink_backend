@@ -31,7 +31,8 @@ jobs:
           docker run --rm --network none \
             --volume "$GITHUB_WORKSPACE:/repo:ro" \
             ghcr.io/betterleaks/betterleaks:v1.10.1 \
-            git /repo --log-opts="--all" --redact=100 --verbose --exit-code=1 --validation=false
+            git /repo --log-opts="--all" --redact=100 --verbose --exit-code=1 --validation=false \
+            --gitleaks-ignore-path=/repo/.betterleaksignore
 
   codeql:
     name: CodeQL (${{ matrix.language }})

@@ -18,6 +18,7 @@ dependencies = [
     "sqlalchemy[asyncio]>=2.0,<3",
     "structlog>=26.1.0",
     "uvicorn[standard]>=0.54.0",
+    "watchtower>=3.4.0,<4",
 ]
 
 [project.scripts]

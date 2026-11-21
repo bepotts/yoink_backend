@@ -12,6 +12,7 @@ from fastapi import Request, Response
 from starlette.middleware.base import RequestResponseEndpoint
 
 from yoink_backend.database import save_request
+from yoink_backend.observability.cloudwatch import configure_cloudwatch_logging
 from yoink_backend.schemas import RequestLogCreate
 
 
@@ -45,6 +46,8 @@ def configure_logging() -> None:
         )
     )
     logging.basicConfig(handlers=[handler], level=logging.INFO, force=True)
+    assert handler.formatter is not None
+    configure_cloudwatch_logging(handler.formatter)
 
 
 # Correlates each request and logs its outcome without headers, bodies, or queries.

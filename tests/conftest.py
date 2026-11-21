@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 # Prevents application imports from enabling telemetry with local credentials.
 os.environ["SENTRY_DSN"] = ""
+os.environ["CLOUDWATCH_ENABLED"] = "false"
 
 
 # Supplies fake sessions while keeping lifecycle and ORM writes observable.
