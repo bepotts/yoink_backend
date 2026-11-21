@@ -1,11 +1,15 @@
 # Isolates HTTP tests from external PostgreSQL connections.
 """Shared database mocks for API tests."""
 
+import os
 from collections.abc import Iterator
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
+
+# Prevents application imports from enabling telemetry with local credentials.
+os.environ["SENTRY_DSN"] = ""
 
 
 # Supplies fake sessions while keeping lifecycle and ORM writes observable.

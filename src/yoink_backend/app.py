@@ -11,10 +11,12 @@ from starlette.concurrency import run_in_threadpool
 
 from yoink_backend.database import open_database
 from yoink_backend.logging import configure_logging, log_request
+from yoink_backend.monitoring import configure_sentry
 from yoink_backend.uploads import check_s3_connection, router
 
 load_dotenv(".env.local")
 load_dotenv(".env")
+configure_sentry()
 
 
 # Initializes PostgreSQL and checks S3 before accepting requests.
