@@ -1,0 +1,89 @@
+# Builds Python distributions and publishes a GitHub Release for matching version tags.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build Python distributions
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out tagged source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.13'
+      - name: Verify tag matches package version
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          python - <<'PYTHON'
+          import os
+          import tomllib
+          from pathlib import Path
+
+          version = tomllib.loads(Path('pyproject.toml').read_text())['project']['version']
+          expected = f'v{version}'
+          if os.environ['RELEASE_TAG'] != expected:
+              raise SystemExit(f'Release tag must match {expected}')
+          PYTHON
+      - name: Set up uv
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: '0.9.21'
+          enable-cache: true
+      - name: Install locked dependencies
+        run: uv sync --locked
+      - name: Run quality checks and tests
+        run: make check
+      - name: Build wheel and source distribution
+        run: uv build
+      - name: Upload distributions
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: release-python
+          path: |
+            dist/*.whl
+            dist/*.tar.gz
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    name: Publish GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Download release artifacts
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        with:
+          pattern: release-*
+          path: artifacts
+      - name: Publish release with generated notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+          PRERELEASE: ${{ contains(github.ref_name, '-') }}
+        shell: bash
+        run: |
+          mapfile -d '' files < <(find artifacts -type f -print0)
+          test "${#files[@]}" -gt 0
+          gh release create "$RELEASE_TAG" "${files[@]}" \
+            --repo "$GH_REPO" --verify-tag --generate-notes \
+            --prerelease="$PRERELEASE"
