@@ -12,7 +12,7 @@ import pytest
 import structlog
 from fastapi import Request, Response
 
-from yoink_backend.logging import configure_logging, log_request
+from yoink_backend.observability.logging import configure_logging, log_request
 
 
 # Confirms application and standard library logs share timestamped JSON formatting.
@@ -22,7 +22,7 @@ def test_json_logging() -> None:
     root = logging.getLogger()
     handlers, level = root.handlers[:], root.level
     try:
-        with patch("yoink_backend.logging.sys.stdout", stream):
+        with patch("yoink_backend.observability.logging.sys.stdout", stream):
             configure_logging()
         structlog.get_logger("test").info("structured", count=2)
         logging.getLogger("library").warning("standard")
@@ -69,7 +69,10 @@ def test_request_logging() -> None:
         )
         with (
             structlog.testing.capture_logs() as records,
-            patch("yoink_backend.logging.save_request", new_callable=AsyncMock) as save,
+            patch(
+                "yoink_backend.observability.logging.save_request",
+                new_callable=AsyncMock,
+            ) as save,
         ):
             responses = await asyncio.gather(
                 log_request(request, success), log_request(request, success)
@@ -110,7 +113,8 @@ def test_database_failure() -> None:
     )
     with (
         patch(
-            "yoink_backend.logging.save_request", side_effect=RuntimeError("offline")
+            "yoink_backend.observability.logging.save_request",
+            side_effect=RuntimeError("offline"),
         ),
         structlog.testing.capture_logs() as records,
     ):
@@ -139,8 +143,10 @@ def test_client_request_id(supplied: str) -> None:
         }
     )
     with (
-        patch("yoink_backend.logging.save_request", new_callable=AsyncMock) as save,
-        patch("yoink_backend.logging.structlog.get_logger") as logger,
+        patch(
+            "yoink_backend.observability.logging.save_request", new_callable=AsyncMock
+        ) as save,
+        patch("yoink_backend.observability.logging.structlog.get_logger") as logger,
     ):
         response = asyncio.run(log_request(request, respond))
         with_context = structlog.contextvars.get_contextvars()
@@ -153,3 +159,29 @@ def test_client_request_id(supplied: str) -> None:
     assert str(save.call_args.args[1].request_id) == request_id
     logger.return_value.info.assert_called_once()
     assert with_context == {}
+
+
+# Limits summary frequency while retaining counts across suppressed reports.
+def test_rejection_summaries() -> None:
+    from yoink_backend.observability.logging import RelayRejections
+
+    tracker = RelayRejections()
+    with (
+        patch(
+            "yoink_backend.observability.logging.monotonic",
+            side_effect=[100, 101, 102, 160],
+        ),
+        patch("yoink_backend.observability.logging.structlog.get_logger") as logger,
+    ):
+        tracker.record(429)
+        tracker.record(429)
+        tracker.record(413)
+        logger.return_value.warning.assert_called_once_with(
+            "client_log_rejections", counts={429: 1}
+        )
+        tracker.record(422)
+        assert logger.return_value.warning.call_count == 2
+        assert logger.return_value.warning.call_args.kwargs == {
+            "counts": {429: 1, 413: 1, 422: 1}
+        }
+    assert tracker.counts == {}

@@ -14,9 +14,11 @@ dependencies = [
     "pydantic-settings>=2,<3",
     "python-dotenv>=1.2.4",
     "python-multipart>=0.0.33",
+    "sentry-sdk[fastapi]>=2.75.0,<3",
     "sqlalchemy[asyncio]>=2.0,<3",
     "structlog>=26.1.0",
     "uvicorn[standard]>=0.54.0",
+    "watchtower>=3.4.0,<4",
 ]
 
 [project.scripts]

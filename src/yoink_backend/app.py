@@ -10,11 +10,15 @@ from fastapi import FastAPI
 from starlette.concurrency import run_in_threadpool
 
 from yoink_backend.database import open_database
-from yoink_backend.logging import configure_logging, log_request
+from yoink_backend.observability.client_logs import router as logs_router
+from yoink_backend.observability.cloudwatch import close_cloudwatch_logging
+from yoink_backend.observability.logging import configure_logging, log_request
+from yoink_backend.observability.monitoring import configure_sentry
 from yoink_backend.uploads import check_s3_connection, router
 
 load_dotenv(".env.local")
 load_dotenv(".env")
+configure_sentry()
 
 
 # Initializes PostgreSQL and checks S3 before accepting requests.
@@ -36,11 +40,14 @@ async def lifespan(application: FastAPI) -> AsyncGenerator[None]:
     except Exception:
         logger.exception("application_failed")
         raise
+    finally:
+        await run_in_threadpool(close_cloudwatch_logging)
 
 
 app = FastAPI(title="Yoink Backend", version="0.1.0", lifespan=lifespan)
 app.middleware("http")(log_request)
 app.include_router(router)
+app.include_router(logs_router)
 
 
 # Reports readiness for container health checks and monitoring.

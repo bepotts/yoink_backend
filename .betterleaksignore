@@ -1,0 +1,11 @@
+# Ignores only reviewed historical local-development examples and test fixtures.
+# The user confirmed these credentials were used locally only, never for hosted services.
+# Fingerprints bind each exception to its commit, file, rule, and line.
+
+# Example PostgreSQL connection in the environment template.
+f5e8b72c8e15d66b4c6c007236faed98e5e020be:.env.example:generic-credential-uri:19
+# Dummy connection string used by the database validation tests.
+f5e8b72c8e15d66b4c6c007236faed98e5e020be:tests/test_database.py:generic-credential-uri:56
+# Local Docker Compose database connection and initialization password.
+f5e8b72c8e15d66b4c6c007236faed98e5e020be:compose.yaml:generic-credential-uri:8
+f5e8b72c8e15d66b4c6c007236faed98e5e020be:compose.yaml:generic-password:20

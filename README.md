@@ -3,6 +3,9 @@
 Python 3.13+ project with a `src/` package layout. Uses uv, Ruff, pytest,
 pytest-cov, mypy, and pre-commit.
 
+The frontend lives in [yoink](https://github.com/bepotts/yoink).
+See that repository for frontend setup instructions.
+
 ## Setup
 
 Install [uv](https://docs.astral.sh/uv/getting-started/installation/), then run:
