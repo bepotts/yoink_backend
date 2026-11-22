@@ -78,3 +78,23 @@ def test_groups_and_shutdown(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_filter(name: str, expected: bool) -> None:
     record = logging.LogRecord(name, logging.INFO, "", 0, "event", (), None)
     assert BackendLogFilter().filter(record) is expected
+
+
+# Releases the first destination when constructing the second destination fails.
+def test_partial_configuration_cleanup(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("CLOUDWATCH_ENABLED", "true")
+    monkeypatch.setenv("CLOUDWATCH_REGION", "us-east-1")
+    handler = MagicMock(spec=logging.Handler)
+    with (
+        patch("yoink_backend.observability.cloudwatch.boto3.client"),
+        patch(
+            "yoink_backend.observability.cloudwatch.watchtower.CloudWatchLogHandler",
+            side_effect=[handler, RuntimeError("frontend denied")],
+        ),
+        pytest.raises(RuntimeError, match="frontend denied"),
+    ):
+        configure_cloudwatch_logging(logging.Formatter())
+    assert handler not in logging.getLogger().handlers
+    handler.close.assert_called_once()
+    close_cloudwatch_logging()
+    handler.close.assert_called_once()

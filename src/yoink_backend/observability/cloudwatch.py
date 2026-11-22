@@ -40,22 +40,29 @@ def configure_cloudwatch_logging(formatter: logging.Formatter) -> None:
     frontend = logging.getLogger("yoink.frontend")
     frontend.setLevel(logging.INFO)
     frontend.propagate = False
-    for source, logger in (("backend", logging.getLogger()), ("frontend", frontend)):
-        handler = watchtower.CloudWatchLogHandler(
-            boto3_client=client,
-            log_group_name=f"{prefix}/{environment}/{source}",
-            log_stream_name="{machine_name}/{process_id}",
-            create_log_group=True,
-            log_group_retention_days=30,
-            send_interval=5,
-            max_batch_count=100,
-        )
-        handler.setLevel(logging.INFO)
-        handler.setFormatter(formatter)
-        if source == "backend":
-            handler.addFilter(BackendLogFilter())
-        logger.addHandler(handler)
-        _handlers.append((logger, handler))
+    try:
+        for source, logger in (
+            ("backend", logging.getLogger()),
+            ("frontend", frontend),
+        ):
+            handler = watchtower.CloudWatchLogHandler(
+                boto3_client=client,
+                log_group_name=f"{prefix}/{environment}/{source}",
+                log_stream_name="{machine_name}/{process_id}",
+                create_log_group=True,
+                log_group_retention_days=30,
+                send_interval=5,
+                max_batch_count=100,
+            )
+            handler.setLevel(logging.INFO)
+            handler.setFormatter(formatter)
+            if source == "backend":
+                handler.addFilter(BackendLogFilter())
+            logger.addHandler(handler)
+            _handlers.append((logger, handler))
+    except Exception:
+        close_cloudwatch_logging()
+        raise
 
 
 # Flushes queued events and detaches delivery handlers on shutdown or reconfiguration.

@@ -159,3 +159,29 @@ def test_client_request_id(supplied: str) -> None:
     assert str(save.call_args.args[1].request_id) == request_id
     logger.return_value.info.assert_called_once()
     assert with_context == {}
+
+
+# Limits summary frequency while retaining counts across suppressed reports.
+def test_rejection_summaries() -> None:
+    from yoink_backend.observability.logging import RelayRejections
+
+    tracker = RelayRejections()
+    with (
+        patch(
+            "yoink_backend.observability.logging.monotonic",
+            side_effect=[100, 101, 102, 160],
+        ),
+        patch("yoink_backend.observability.logging.structlog.get_logger") as logger,
+    ):
+        tracker.record(429)
+        tracker.record(429)
+        tracker.record(413)
+        logger.return_value.warning.assert_called_once_with(
+            "client_log_rejections", counts={429: 1}
+        )
+        tracker.record(422)
+        assert logger.return_value.warning.call_count == 2
+        assert logger.return_value.warning.call_args.kwargs == {
+            "counts": {429: 1, 413: 1, 422: 1}
+        }
+    assert tracker.counts == {}

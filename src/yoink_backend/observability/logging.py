@@ -4,7 +4,7 @@
 import logging
 import sys
 from datetime import UTC, datetime
-from time import perf_counter
+from time import monotonic, perf_counter
 from uuid import UUID, uuid4
 
 import structlog
@@ -14,6 +14,33 @@ from starlette.middleware.base import RequestResponseEndpoint
 from yoink_backend.database import save_request
 from yoink_backend.observability.cloudwatch import configure_cloudwatch_logging
 from yoink_backend.schemas import RequestLogCreate
+
+
+# Counts relay rejections using fixed status keys and at most one summary per minute.
+class RelayRejections:
+    # Stores totals without retaining client addresses or request metadata.
+    counts: dict[int, int]
+    # Marks the earliest time another summary may be emitted.
+    next_report: float
+
+    # Initializes bounded rejection tracking for one worker.
+    def __init__(self) -> None:
+        self.counts = {}
+        self.next_report = 0.0
+
+    # Emits a bounded summary while avoiding database writes for rejected requests.
+    def record(self, status: int) -> None:
+        self.counts[status] = self.counts.get(status, 0) + 1
+        now = monotonic()
+        if now >= self.next_report:
+            structlog.get_logger(__name__).warning(
+                "client_log_rejections", counts=dict(self.counts)
+            )
+            self.counts.clear()
+            self.next_report = now + 60
+
+
+relay_rejections = RelayRejections()
 
 
 # Routes application and library records through the same JSON processor chain.
@@ -61,6 +88,7 @@ async def log_request(request: Request, call_next: RequestResponseEndpoint) -> R
     started_at = datetime.now(UTC)
     status_code = 500
     error_type = None
+    rejected_relay = False
     structlog.contextvars.bind_contextvars(
         request_id=str(request_id), method=request.method, path=request.url.path
     )
@@ -70,11 +98,19 @@ async def log_request(request: Request, call_next: RequestResponseEndpoint) -> R
         response = await call_next(request)
         response.headers["X-Request-ID"] = str(request_id)
         status_code = response.status_code
-        logger.info(
-            "request_completed",
-            status_code=response.status_code,
-            duration_ms=round((perf_counter() - started) * 1000, 2),
+        rejected_relay = (
+            request.method == "POST"
+            and request.url.path == "/logs"
+            and status_code in {429, 413, 422, 503}
         )
+        if rejected_relay:
+            relay_rejections.record(status_code)
+        else:
+            logger.info(
+                "request_completed",
+                status_code=response.status_code,
+                duration_ms=round((perf_counter() - started) * 1000, 2),
+            )
         return response
     except Exception as error:
         error_type = type(error).__name__
@@ -86,21 +122,22 @@ async def log_request(request: Request, call_next: RequestResponseEndpoint) -> R
         raise
     finally:
         try:
-            await save_request(
-                request.app.state.database,
-                RequestLogCreate(
-                    request_id=request_id,
-                    started_at=started_at,
-                    method=request.method,
-                    path=request.url.path,
-                    status_code=status_code,
-                    duration_ms=round((perf_counter() - started) * 1000, 2),
-                    client_ip=request.client.host if request.client else None,
-                    user_agent=request.headers.get("user-agent"),
-                    http_version=request.scope.get("http_version", "1.1"),
-                    error_type=error_type,
-                ),
-            )
+            if not rejected_relay:
+                await save_request(
+                    request.app.state.database,
+                    RequestLogCreate(
+                        request_id=request_id,
+                        started_at=started_at,
+                        method=request.method,
+                        path=request.url.path,
+                        status_code=status_code,
+                        duration_ms=round((perf_counter() - started) * 1000, 2),
+                        client_ip=request.client.host if request.client else None,
+                        user_agent=request.headers.get("user-agent"),
+                        http_version=request.scope.get("http_version", "1.1"),
+                        error_type=error_type,
+                    ),
+                )
         except Exception:
             logger.exception("request_log_persistence_failed")
         finally:

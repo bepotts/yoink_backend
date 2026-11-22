@@ -139,3 +139,28 @@ def test_missing_client(relay: tuple[TestClient, BufferingHandler]) -> None:
         ),
     )
     assert asyncio.run(receive_client_logs(request)).status_code == 202
+
+
+# Exercises real rejection paths through middleware without backend persistence.
+@pytest.mark.parametrize("status", [413, 422, 429, 503])
+def test_rejections_skip_backend_writes(
+    relay: tuple[TestClient, BufferingHandler], status: int
+) -> None:
+    client, _ = relay
+    if status == 503:
+        logging.getLogger("yoink.frontend").handlers = []
+    with (
+        patch(
+            "yoink_backend.observability.client_logs.limiter.allow",
+            return_value=status != 429,
+        ),
+        patch(
+            "yoink_backend.observability.logging.save_request", new_callable=AsyncMock
+        ) as save,
+        patch("yoink_backend.observability.logging.structlog.get_logger") as logger,
+    ):
+        response = client.post("/logs", content=b"x" * (16_385 if status == 413 else 1))
+        assert response.status_code == status
+        assert response.headers["X-Request-ID"]
+        save.assert_not_awaited()
+        logger.return_value.info.assert_not_called()
