@@ -6,7 +6,7 @@ ACT_FLAGS ?= --workflows .github/workflows/ci.yml --container-architecture linux
 # Keeps local application configuration and credentials out of simulated CI jobs.
 ACT_INPUTS := --env-file /dev/null --secret-file /dev/null --var-file /dev/null --input-file /dev/null
 
-.PHONY: act-list act-check act-docker act-ci migrate migration-check help install run dev check lint format-check typecheck format test build docker-build docker-up docker-down docker-logs
+.PHONY: act-list act-check act-docker act-ci migrate migration-check help install run dev check lint format-check typecheck format test build docker-build docker-start docker-start-production docker-down-production docker-logs-production docker-up docker-down docker-logs
 
 help:
 	@printf '%s\n' \
@@ -27,7 +27,11 @@ help:
 	  'test          Run tests with coverage' \
 	  'build         Build wheel and source distribution' \
 	  'docker-build  Build the Docker image' \
-	  'docker-up     Build and start Docker services in the background' \
+	  'docker-start  Build, migrate, and start the API in Docker' \
+	  'docker-start-production Build, migrate, and start using Amazon RDS' \
+	  'docker-down-production Stop the production API' \
+	  'docker-logs-production Follow production API logs' \
+	  'docker-up     Alias for docker-start' \
 	  'docker-down   Stop and remove Docker services' \
 	  'docker-logs   Follow backend container logs'
 
@@ -64,8 +68,29 @@ build:
 docker-build:
 	docker compose build
 
-docker-up:
-	docker compose up --build --detach --wait
+# Builds the API, prepares its database, and waits until the service is healthy.
+docker-start:
+	docker compose build backend
+	docker compose up --detach --wait postgres
+	docker compose run --rm --no-deps backend alembic upgrade head
+	docker compose up --detach --wait backend
+
+# Starts only the API and applies migrations to the configured RDS database.
+docker-start-production:
+	docker compose -f compose.production.yaml build backend
+	docker compose -f compose.production.yaml run --rm --no-deps backend alembic upgrade head
+	docker compose -f compose.production.yaml up --detach --wait backend
+
+# Stops the production API without changing the RDS database.
+docker-down-production:
+	docker compose -f compose.production.yaml down
+
+# Follows logs from the production API connected to RDS.
+docker-logs-production:
+	docker compose -f compose.production.yaml logs --follow backend
+
+# Preserves the existing startup command with the same migration ordering.
+docker-up: docker-start
 
 docker-down:
 	docker compose down

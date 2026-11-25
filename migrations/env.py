@@ -1,6 +1,8 @@
 # Runs Alembic against the database selected by the backend environment settings.
 """Migration configuration shared by development and production."""
 
+import os
+
 from alembic import context
 from dotenv import load_dotenv
 from sqlalchemy import create_engine, pool
@@ -31,7 +33,17 @@ def run_migrations_offline() -> None:
 def run_migrations_online() -> None:
     """Run transactional DDL and release connections even when migrations fail."""
     settings = DatabaseSettings()
-    url = make_url(str(settings.database_url)).set(drivername="postgresql+psycopg")
+    runtime_url = make_url(str(settings.database_url))
+    suffix = "PROD" if settings.app_env == "production" else "DEV"
+    administrator = os.environ.get(f"DATABASE_{suffix}_ADMIN_URL", "")
+    if not administrator:
+        raise ValueError(f"Configure DATABASE_{suffix}_ADMIN_URL for migrations")
+    url = make_url(administrator).set(drivername="postgresql+psycopg")
+    if (url.database != runtime_url.database) or (url.host, url.port or 5432) != (
+        runtime_url.host,
+        runtime_url.port or 5432,
+    ):
+        raise ValueError("Administrator and runtime URLs must select the same database")
     engine = create_engine(
         url,
         poolclass=pool.NullPool,

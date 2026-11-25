@@ -5,8 +5,10 @@ services:
     env_file:
       - .env
     environment:
-      DATABASE_DEV_URL: ${DATABASE_DEV_URL:-postgresql://yoink:yoink@postgres:5432/yoink_development}
+      DATABASE_DEV_URL: ${DATABASE_DEV_URL:-postgresql://yoink_dev_runtime:change-me@postgres:5432/yoink_development}
       DATABASE_PROD_URL: ${DATABASE_PROD_URL:-}
+      DATABASE_DEV_ADMIN_URL: ${DATABASE_DEV_ADMIN_URL:-postgresql://yoink:yoink@postgres:5432/yoink_development}
+      DATABASE_PROD_ADMIN_URL: ${DATABASE_PROD_ADMIN_URL:-}
     depends_on:
       postgres:
         condition: service_healthy

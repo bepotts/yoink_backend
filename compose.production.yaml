@@ -1,0 +1,17 @@
+# Runs the production API and migrations against external Amazon RDS PostgreSQL.
+services:
+  backend:
+    build: .
+    env_file:
+      - .env
+    environment:
+      APP_ENV: production
+      DATABASE_PROD_URL: ${DATABASE_PROD_URL:?Set DATABASE_PROD_URL to the RDS runtime connection}
+      DATABASE_PROD_ADMIN_URL: ${DATABASE_PROD_ADMIN_URL:?Set DATABASE_PROD_ADMIN_URL to the RDS migration connection}
+      PGSSLMODE: verify-full
+      PGSSLROOTCERT: /app/certs/global-bundle.pem
+    volumes:
+      - ./certs:/app/certs:ro
+    ports:
+      - "127.0.0.1:8000:8000"
+    init: true

@@ -51,11 +51,16 @@ belong only on the backend. Grant its AWS identity `s3:PutObject` and
 With Docker and Compose installed, run:
 
 ```sh
-docker compose up --build
+make docker-start
 ```
 
-The API is available at the same local URLs. Stop with Ctrl+C, then run
-`docker compose down` to remove the container. The image runs as a non-root user
+The command builds the image, starts PostgreSQL, applies Alembic migrations, and
+starts the API in the background. Configure `.env` first, including S3 access and
+the runtime/administrator database URLs described in [migration setup](migrations/USAGE.md).
+For Compose, database URLs use host `postgres`; keep local port 5432 available.
+
+The API is available at the same local URLs. Run `make docker-logs` to follow logs
+and `make docker-down` to stop the services. The image runs as a non-root user
 and includes a health check. Compose binds the published port to localhost.
 
 ## Development
