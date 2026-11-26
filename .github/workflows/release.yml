@@ -1,4 +1,4 @@
-# Builds Python distributions and publishes a GitHub Release for matching version tags.
+# Publishes Python releases and deploys the backend Docker image through ECR to ECS.
 name: Release
 
 on:
@@ -87,3 +87,83 @@ jobs:
           gh release create "$RELEASE_TAG" "${files[@]}" \
             --repo "$GH_REPO" --verify-tag --generate-notes \
             --prerelease="$PRERELEASE"
+
+  deploy:
+    name: Publish image and deploy to ECS
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    concurrency:
+      group: release-ecs-production
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      AWS_ROLE_ARN: ${{ vars.AWS_ROLE_ARN }}
+      ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
+      ECS_CLUSTER: ${{ vars.ECS_CLUSTER }}
+      ECS_SERVICE: ${{ vars.ECS_SERVICE }}
+      ECS_CONTAINER_NAME: ${{ vars.ECS_CONTAINER_NAME }}
+    steps:
+      - name: Check out tagged source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Validate deployment configuration
+        shell: bash
+        run: |
+          for variable in AWS_REGION AWS_ROLE_ARN ECR_REPOSITORY ECS_CLUSTER ECS_SERVICE ECS_CONTAINER_NAME; do
+            if [[ -z "${!variable}" ]]; then
+              echo "::error::Set the GitHub Actions repository variable $variable before releasing."
+              exit 1
+            fi
+          done
+      - name: Configure AWS credentials through OIDC
+        uses: aws-actions/configure-aws-credentials@cabfdba3510de1431bac9dba27511d97497fc100 # v5
+        with:
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Log in to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@7290e214a610b32bc0eef81748948b6d466a8783 # v2
+      - name: Build and push Docker image
+        id: image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        shell: bash
+        run: |
+          image="$ECR_REGISTRY/$ECR_REPOSITORY:$GITHUB_SHA-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          docker build --tag "$image" .
+          docker push "$image"
+          digest=$(docker inspect --format='{{index .RepoDigests 0}}' "$image")
+          echo "uri=$digest" >> "$GITHUB_OUTPUT"
+      - name: Download the current ECS service task definition
+        shell: bash
+        run: |
+          task_definition=$(aws ecs describe-services \
+            --cluster "$ECS_CLUSTER" --services "$ECS_SERVICE" \
+            --query 'services[0].taskDefinition' --output text)
+          if [[ -z "$task_definition" || "$task_definition" == "None" ]]; then
+            echo "::error::The configured ECS service has no task definition."
+            exit 1
+          fi
+          aws ecs describe-task-definition --task-definition "$task_definition" \
+            --query taskDefinition --output json > current-task-definition.json
+          jq 'del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy, .deregisteredAt)' \
+            current-task-definition.json > task-definition.json
+      - name: Set the new container image in the task definition
+        id: task-definition
+        uses: aws-actions/amazon-ecs-render-task-definition@8d79160660ad39c402a16e5fc7cd2a32e8f7d6b7 # v1
+        with:
+          task-definition: task-definition.json
+          container-name: ${{ env.ECS_CONTAINER_NAME }}
+          image: ${{ steps.image.outputs.uri }}
+      - name: Deploy the task definition to ECS
+        uses: aws-actions/amazon-ecs-deploy-task-definition@a00d4d57ac0de1a99b39fe469f3d898d38717c2b # v2
+        with:
+          task-definition: ${{ steps.task-definition.outputs.task-definition }}
+          cluster: ${{ env.ECS_CLUSTER }}
+          service: ${{ env.ECS_SERVICE }}
+          wait-for-service-stability: true
