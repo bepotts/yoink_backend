@@ -9,3 +9,21 @@ f5e8b72c8e15d66b4c6c007236faed98e5e020be:tests/test_database.py:generic-credenti
 # Local Docker Compose database connection and initialization password.
 f5e8b72c8e15d66b4c6c007236faed98e5e020be:compose.yaml:generic-credential-uri:8
 f5e8b72c8e15d66b4c6c007236faed98e5e020be:compose.yaml:generic-password:20
+
+# Local development runtime and administrator connection defaults.
+f95a3501875c029942496474fd0c5984be619de1:compose.yaml:generic-credential-uri:8
+f95a3501875c029942496474fd0c5984be619de1:compose.yaml:generic-credential-uri:10
+# Development connection examples and the production PASSWORD/hostname placeholders.
+f95a3501875c029942496474fd0c5984be619de1:.env.example:generic-credential-uri:19
+f95a3501875c029942496474fd0c5984be619de1:.env.example:generic-credential-uri:21
+f95a3501875c029942496474fd0c5984be619de1:.env.example:generic-credential-uri:24
+# Dummy passwords verifying that offline migration SQL does not expose credentials.
+f95a3501875c029942496474fd0c5984be619de1:tests/test_migrations.py:generic-credential-uri:71
+f95a3501875c029942496474fd0c5984be619de1:tests/test_migrations.py:generic-credential-uri:75
+
+# Reviewed development defaults copied into the one-off migration service.
+e829ccb493a216f17f1662bfecd3c8e729b011fb:compose.yaml:generic-credential-uri:31
+e829ccb493a216f17f1662bfecd3c8e729b011fb:compose.yaml:generic-credential-uri:32
+
+# Dummy password used only to validate Compose configuration, without starting a database.
+5cbee7203630f6bfc401c22ccc16d07f23c94467:.github/workflows/ci.yml:generic-password:133

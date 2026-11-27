@@ -5,6 +5,7 @@ import io
 import runpy
 from pathlib import Path
 
+import pytest
 from alembic import command
 from alembic.autogenerate import compare_metadata
 from alembic.config import Config
@@ -50,3 +51,38 @@ def test_offline_migration() -> None:
     assert "TIMESTAMP WITH TIME ZONE" in sql
     assert "CREATE INDEX request_logs_started_at_idx" in sql
     assert "INSERT INTO alembic_version" in sql
+
+
+# Requires each environment to render its own restricted role without leaking secrets.
+@pytest.mark.parametrize(
+    ("environment", "role", "other_role"),
+    [
+        ("development", "yoink_dev_runtime", "yoink_prod_runtime"),
+        ("production", "yoink_prod_runtime", "yoink_dev_runtime"),
+    ],
+)
+def test_runtime_permissions_sql(
+    monkeypatch: pytest.MonkeyPatch, environment: str, role: str, other_role: str
+) -> None:
+    """Verify exported DDL selects one login and grants only runtime access."""
+    monkeypatch.setenv("APP_ENV", environment)
+    monkeypatch.setenv(
+        "DATABASE_DEV_URL",
+        "postgresql://yoink_dev_runtime:private-secret@localhost/dev",
+    )
+    monkeypatch.setenv(
+        "DATABASE_PROD_URL",
+        "postgresql://yoink_prod_runtime:private-secret@localhost/prod",
+    )
+    output = io.StringIO()
+    config = Config(str(ROOT / "alembic.ini"), output_buffer=output)
+    command.upgrade(config, "0001:head", sql=True)
+    sql = output.getvalue()
+    assert f"CREATE ROLE {role}" in sql
+    assert other_role not in sql
+    assert "private-secret" not in sql
+    assert f"GRANT SELECT, INSERT ON TABLE public.request_logs TO {role}" in sql
+    assert f"REVOKE ALL ON ALL TABLES IN SCHEMA public FROM {role}" in sql
+    assert "NOCREATEROLE NOINHERIT" in sql
+    assert "rolsuper OR rolreplication OR rolbypassrls" in sql
+    assert "ALTER DEFAULT PRIVILEGES" in sql
