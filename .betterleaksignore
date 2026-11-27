@@ -20,3 +20,7 @@ f95a3501875c029942496474fd0c5984be619de1:.env.example:generic-credential-uri:24
 # Dummy passwords verifying that offline migration SQL does not expose credentials.
 f95a3501875c029942496474fd0c5984be619de1:tests/test_migrations.py:generic-credential-uri:71
 f95a3501875c029942496474fd0c5984be619de1:tests/test_migrations.py:generic-credential-uri:75
+
+# Reviewed development defaults copied into the one-off migration service.
+e829ccb493a216f17f1662bfecd3c8e729b011fb:compose.yaml:generic-credential-uri:31
+e829ccb493a216f17f1662bfecd3c8e729b011fb:compose.yaml:generic-credential-uri:32

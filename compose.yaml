@@ -15,7 +15,7 @@ services:
       CLOUDWATCH_ENABLED: ${CLOUDWATCH_ENABLED:-false}
       CLOUDWATCH_LOG_GROUP_PREFIX: ${CLOUDWATCH_LOG_GROUP_PREFIX:-/yoink}
       APP_ENV: development
-      DATABASE_DEV_URL: ${DATABASE_DEV_URL:-postgresql://yoink_dev_runtime:change-me@postgres:5432/yoink_development}
+      DATABASE_DEV_URL: ${DATABASE_DEV_URL:?Set DATABASE_DEV_URL in your ignored env file}
     depends_on:
       postgres:
         condition: service_healthy
@@ -28,8 +28,8 @@ services:
     command: [alembic, upgrade, head]
     environment:
       APP_ENV: development
-      DATABASE_DEV_URL: ${DATABASE_DEV_URL:-postgresql://yoink_dev_runtime:change-me@postgres:5432/yoink_development}
-      DATABASE_DEV_ADMIN_URL: ${DATABASE_DEV_ADMIN_URL:-postgresql://yoink:yoink@postgres:5432/yoink_development}
+      DATABASE_DEV_URL: ${DATABASE_DEV_URL:?Set DATABASE_DEV_URL in your ignored env file}
+      DATABASE_DEV_ADMIN_URL: ${DATABASE_DEV_ADMIN_URL:?Set DATABASE_DEV_ADMIN_URL in your ignored env file}
     depends_on:
       postgres:
         condition: service_healthy
@@ -39,7 +39,7 @@ services:
     image: postgres:18
     environment:
       POSTGRES_USER: yoink
-      POSTGRES_PASSWORD: yoink
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in your ignored env file}
       POSTGRES_DB: yoink_development
     ports:
       - "127.0.0.1:5432:5432"

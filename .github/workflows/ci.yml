@@ -127,6 +127,10 @@ jobs:
         with:
           persist-credentials: false
       - name: Validate Compose configuration
+        env:
+          DATABASE_DEV_URL: postgresql://postgres/ci
+          DATABASE_DEV_ADMIN_URL: postgresql://postgres/ci
+          POSTGRES_PASSWORD: ci-placeholder
         run: |
           cp .env.example .env
           docker compose config --quiet

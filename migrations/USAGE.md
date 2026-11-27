@@ -105,3 +105,8 @@ Docker passes administrator URLs only to the one-off `migrate` service. The API
 receives an explicit list of runtime settings for its selected environment; it
 does not import the complete `.env` file. Compose reads `.env` for interpolation;
 use `docker compose --env-file .env.local ...` when using `.env.local` instead.
+
+Database URLs and `POSTGRES_PASSWORD` have no checked-in Docker defaults. Set them
+in ignored `.env` (or pass `--env-file .env.local`). Use `postgres` as the URL host
+inside Docker and match `POSTGRES_PASSWORD` to the administrator URL password.
+Changing this variable does not rotate passwords in an existing PostgreSQL volume.
