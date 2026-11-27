@@ -131,6 +131,8 @@ jobs:
           DATABASE_DEV_URL: postgresql://postgres/ci
           DATABASE_DEV_ADMIN_URL: postgresql://postgres/ci
         run: |
+          # CI has no private .env file; supply the required password only for Compose validation.
+          # This does not start PostgreSQL or change any database password.
           POSTGRES_PASSWORD=$(openssl rand -hex 16)
           export POSTGRES_PASSWORD
           cp .env.example .env
