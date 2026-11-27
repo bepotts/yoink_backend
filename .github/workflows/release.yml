@@ -90,6 +90,7 @@ jobs:
 
   deploy:
     name: Publish image and deploy to ECS
+    if: ${{ !contains(github.ref_name, '-') }}
     needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 30

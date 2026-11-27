@@ -2,19 +2,39 @@
 services:
   backend:
     build: .
-    env_file:
-      - .env
     environment:
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      AWS_SESSION_TOKEN: ${AWS_SESSION_TOKEN:-}
+      SENTRY_DSN: ${SENTRY_DSN:-}
+      SENTRY_RELEASE: ${SENTRY_RELEASE:-}
+      CLOUDWATCH_REGION: ${CLOUDWATCH_REGION:-}
+      S3_DEV_BUCKET: ${S3_DEV_BUCKET:-}
+      S3_DEV_REGION: ${S3_DEV_REGION:-}
+      S3_DEV_PREFIX: ${S3_DEV_PREFIX:-videos}
+      CLOUDWATCH_ENABLED: ${CLOUDWATCH_ENABLED:-false}
+      CLOUDWATCH_LOG_GROUP_PREFIX: ${CLOUDWATCH_LOG_GROUP_PREFIX:-/yoink}
+      APP_ENV: development
       DATABASE_DEV_URL: ${DATABASE_DEV_URL:-postgresql://yoink_dev_runtime:change-me@postgres:5432/yoink_development}
-      DATABASE_PROD_URL: ${DATABASE_PROD_URL:-}
-      DATABASE_DEV_ADMIN_URL: ${DATABASE_DEV_ADMIN_URL:-postgresql://yoink:yoink@postgres:5432/yoink_development}
-      DATABASE_PROD_ADMIN_URL: ${DATABASE_PROD_ADMIN_URL:-}
     depends_on:
       postgres:
         condition: service_healthy
     ports:
       - "127.0.0.1:8000:8000"
     init: true
+  migrate:
+    build: .
+    profiles: [migration]
+    command: [alembic, upgrade, head]
+    environment:
+      APP_ENV: development
+      DATABASE_DEV_URL: ${DATABASE_DEV_URL:-postgresql://yoink_dev_runtime:change-me@postgres:5432/yoink_development}
+      DATABASE_DEV_ADMIN_URL: ${DATABASE_DEV_ADMIN_URL:-postgresql://yoink:yoink@postgres:5432/yoink_development}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      disable: true
   postgres:
     image: postgres:18
     environment:

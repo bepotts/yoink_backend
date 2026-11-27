@@ -57,6 +57,14 @@ def upgrade() -> None:
             ) THEN
                 RAISE EXCEPTION 'Runtime role has elevated privileges';
             END IF;
+            IF EXISTS (
+                SELECT 1 FROM pg_shdepend
+                WHERE refclassid = 'pg_authid'::regclass
+                AND refobjid = (SELECT oid FROM pg_roles WHERE rolname = '{role}')
+                AND deptype = 'o'
+            ) THEN
+                RAISE EXCEPTION 'Runtime role must not own database objects';
+            END IF;
             IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '{role}') THEN
                 CREATE ROLE {role};
             END IF;

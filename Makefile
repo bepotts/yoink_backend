@@ -70,15 +70,15 @@ docker-build:
 
 # Builds the API, prepares its database, and waits until the service is healthy.
 docker-start:
-	docker compose build backend
+	docker compose build backend migrate
 	docker compose up --detach --wait postgres
-	docker compose run --rm --no-deps backend alembic upgrade head
+	docker compose run --rm --no-deps migrate
 	docker compose up --detach --wait backend
 
 # Starts only the API and applies migrations to the configured RDS database.
 docker-start-production:
-	docker compose -f compose.production.yaml build backend
-	docker compose -f compose.production.yaml run --rm --no-deps backend alembic upgrade head
+	docker compose -f compose.production.yaml build backend migrate
+	docker compose -f compose.production.yaml run --rm --no-deps migrate
 	docker compose -f compose.production.yaml up --detach --wait backend
 
 # Stops the production API without changing the RDS database.

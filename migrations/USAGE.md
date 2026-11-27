@@ -47,7 +47,7 @@ For Docker, runtime and administrator URLs must use `postgres` as the host rathe
 than `localhost`. With shell overrides for those URLs, run migrations before the API:
 
 ```sh
-docker compose run --rm backend alembic upgrade head
+docker compose run --rm migrate
 ```
 
 After changing ORM models, generate and review a revision, then apply it:
@@ -75,7 +75,8 @@ service. Create the RDS instance/database first and allow PostgreSQL traffic fro
 the application host in the RDS security group. Use the RDS endpoint in both
 production URLs; the runtime user is `yoink_prod_runtime`, while migrations use
 the RDS administrator/database owner. The role migration works without PostgreSQL
-superuser access and refuses to reuse an elevated runtime role.
+superuser access and refuses to reuse an elevated runtime role or one that owns
+database objects. An administrator must transfer ownership before retrying.
 
 Download the public Amazon RDS CA bundle into `certs/global-bundle.pem`:
 
@@ -99,3 +100,8 @@ make docker-down-production
 
 The start command builds the API, migrates RDS, and starts the API. It does not
 provision AWS resources or start the development PostgreSQL container.
+
+Docker passes administrator URLs only to the one-off `migrate` service. The API
+receives an explicit list of runtime settings for its selected environment; it
+does not import the complete `.env` file. Compose reads `.env` for interpolation;
+use `docker compose --env-file .env.local ...` when using `.env.local` instead.
