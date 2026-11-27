@@ -24,3 +24,6 @@ f95a3501875c029942496474fd0c5984be619de1:tests/test_migrations.py:generic-creden
 # Reviewed development defaults copied into the one-off migration service.
 e829ccb493a216f17f1662bfecd3c8e729b011fb:compose.yaml:generic-credential-uri:31
 e829ccb493a216f17f1662bfecd3c8e729b011fb:compose.yaml:generic-credential-uri:32
+
+# Dummy password used only to validate Compose configuration, without starting a database.
+5cbee7203630f6bfc401c22ccc16d07f23c94467:.github/workflows/ci.yml:generic-password:133

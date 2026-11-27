@@ -3,16 +3,19 @@
 
 # Matches GitHub's Linux runners, including when act runs on Apple Silicon.
 ACT_FLAGS ?= --workflows .github/workflows/ci.yml --container-architecture linux/amd64 --platform ubuntu-latest=catthehacker/ubuntu:act-latest
+# Binds the checkout so the secrets job's nested Docker scan can read it on the host.
+ACT_SECURITY_FLAGS ?= --workflows .github/workflows/security.yml --container-architecture linux/amd64 --platform ubuntu-latest=catthehacker/ubuntu:act-latest --bind
 # Keeps local application configuration and credentials out of simulated CI jobs.
 ACT_INPUTS := --env-file /dev/null --secret-file /dev/null --var-file /dev/null --input-file /dev/null
 
-.PHONY: act-list act-check act-docker act-ci migrate migration-check help install run dev check lint format-check typecheck format test build docker-build docker-start docker-start-production docker-down-production docker-logs-production docker-up docker-down docker-logs
+.PHONY: act-list act-check act-docker act-secrets act-ci migrate migration-check help install run dev check lint format-check typecheck format test build docker-build docker-start docker-start-production docker-down-production docker-logs-production docker-up docker-down docker-logs
 
 help:
 	@printf '%s\n' \
 	  'act-list      List GitHub Actions jobs available locally' \
 	  'act-check     Run lint, types, tests, and packaging with act' \
 	  'act-docker    Run the Docker build and smoke test with act' \
+	  'act-secrets   Run the GitHub secrets workflow locally with act' \
 	  'act-ci        Run the full GitHub Actions workflow with act' \
 	  'install       Install locked development dependencies' \
 	  'migrate       Apply migrations to the APP_ENV-selected database' \
@@ -121,3 +124,7 @@ act-docker:
 # Runs every push-triggered job from the backend workflow.
 act-ci:
 	act push $(ACT_FLAGS) $(ACT_INPUTS)
+
+# Runs only the secrets job, using its checked-in Betterleaks configuration.
+act-secrets:
+	act push $(ACT_SECURITY_FLAGS) $(ACT_INPUTS) --job secrets
