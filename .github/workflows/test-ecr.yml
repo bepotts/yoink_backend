@@ -1,4 +1,5 @@
-# Manually verifies the release role's AWS identity, ECR repository access, and Docker login.
+# Manually verifies the release role's AWS identity,
+# ECR repository access, and Docker login.
 name: Test ECR credentials
 
 on:
@@ -13,10 +14,12 @@ jobs:
     name: Verify AWS and ECR access
     runs-on: ubuntu-latest
     timeout-minutes: 5
+
     env:
       AWS_REGION: ${{ vars.AWS_REGION }}
       AWS_ROLE_ARN: ${{ vars.AWS_ROLE_ARN }}
       ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
+
     steps:
       - name: Validate configuration
         shell: bash
@@ -27,22 +30,39 @@ jobs:
               exit 1
             fi
           done
+
+      - name: Verify GitHub execution context
+        shell: bash
+        env:
+          REPOSITORY: ${{ github.repository }}
+          REF: ${{ github.ref }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          echo "Repository: $REPOSITORY"
+          echo "Ref: $REF"
+          echo "Event: $EVENT"
+
       - name: Configure AWS credentials through OIDC
         uses: aws-actions/configure-aws-credentials@cabfdba3510de1431bac9dba27511d97497fc100 # v5
         with:
           role-to-assume: ${{ env.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
           retry-max-attempts: 3
+
       - name: Verify AWS identity
         run: aws sts get-caller-identity
+
       - name: Verify ECR repository access
         shell: bash
         run: |
           aws ecr describe-repositories \
             --repository-names "$ECR_REPOSITORY" \
-            --query 'repositories[0].repositoryUri' --output text
+            --query 'repositories[0].repositoryUri' \
+            --output text
+
       - name: Verify Docker login to ECR
         uses: aws-actions/amazon-ecr-login@7290e214a610b32bc0eef81748948b6d466a8783 # v2
+
       - name: Summarize successful checks
         shell: bash
         run: |
@@ -54,5 +74,6 @@ jobs:
           - Found the configured ECR repository with ecr:DescribeRepositories.
           - Successfully authenticated Docker to ECR.
 
-          This check does not push an image or deploy to ECS. Image upload permissions are not tested.
+          This check does not push an image or deploy to ECS.
+          Image upload permissions are not tested.
           SUMMARY
